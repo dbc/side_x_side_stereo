@@ -75,12 +75,14 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
         cv::Mat rightImage = cv::Mat(image, rightROI);
 
         // Apply scaling, if specified.
-        if (bool use_scaled = (outputWidth > 0 && outputHeight > 0))
+        bool use_scaled;
+        cv::Mat leftScaled, rightScaled;
+        if (use_scaled = (outputWidth > 0 && outputHeight > 0))
         {
-            cv::Mat leftScaled, rightScaled;
             cv::Size sz = cv::Size(outputWidth, outputHeight);
             cv::resize(leftImage, leftScaled, sz);
             cv::resize(rightImage, rightScaled, sz);
+        }
 
         // Publish.
         cv_bridge::CvImage cvImage;
@@ -107,7 +109,7 @@ int main(int argc, char** argv)
     image_transport::ImageTransport it(nh);
 
     // load node settings
-    std::string inputInputTopic, leftOutputImageTopic, rightOutputImageTopic;
+    std::string inputImageTopic, leftOutputImageTopic, rightOutputImageTopic;
     nh.param("input_image_topic", inputImageTopic, std::string("not_set"));
     nh.param("left_output_image_topic", leftOutputImageTopic,
         std::string("/stereo/left/image_raw"));
