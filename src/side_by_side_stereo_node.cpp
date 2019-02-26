@@ -46,6 +46,9 @@
 // outputHeight is the same as the height of the input image.
 int outputWidth, outputHeight;
 
+// Input image subscriber.
+ros::Subscriber imageSub;
+
 // Left and right image publishers.
 image_transport::Publisher leftImagePublisher;
 image_transport::Publisher rightImagePublisher;
@@ -110,17 +113,17 @@ int main(int argc, char** argv)
 
     // load node settings
     std::string inputImageTopic, leftOutputImageTopic, rightOutputImageTopic;
-    nh.param("input_image_topic", inputImageTopic, std::string("not_set"));
+    nh.param("input_image_topic", inputImageTopic, std::string("input_image_topic_not_set"));
+    ROS_INFO("input topic to stereo splitter=%s\n", inputImageTopic.c_str());
     nh.param("left_output_image_topic", leftOutputImageTopic,
         std::string("/stereo/left/image_raw"));
     nh.param("right_output_image_topic", rightOutputImageTopic,
         std::string("/stereo/right/image_raw"));
-    nh.param("output_width", outputWidth, 0);
-    nh.param("output_height", outputHeight, 0);
+    nh.param("output_width", outputWidth, 0);  // 0 -> defaults to 1/2 input width.
+    nh.param("output_height", outputHeight, 0); // 0 -> defaults to input height.
 
     // register publishers and subscriber
-    ros::Subscriber imageSub = nh.subscribe(
-        inputImageTopic.c_str(), 2, &imageCallback);
+    imageSub = nh.subscribe(inputImageTopic.c_str(), 2, &imageCallback);
     leftImagePublisher = it.advertise(leftOutputImageTopic.c_str(), 1);
     rightImagePublisher = it.advertise(rightOutputImageTopic.c_str(), 1);
 
