@@ -39,6 +39,7 @@
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
 #include <image_transport/image_transport.h>
+#include <camera_info_manager/camera_info_manager.h>
 
 
 // If non-zero, outputWidth and outputHeight set the size of the output images.
@@ -50,8 +51,16 @@ int outputWidth, outputHeight;
 ros::Subscriber imageSub;
 
 // Left and right image publishers.
-image_transport::Publisher leftImagePublisher;
-image_transport::Publisher rightImagePublisher;
+image_transport::Publisher leftImagePublisher, rightImagePublisher;
+
+// Left and right camera info publishers and messages.
+ros::Publisher leftCameraInfoPublisher, rightCameraInfoPublisher;
+sensor_msgs::CameraInfo leftCameraInfoMsg, rightCameraInfoMsg;
+
+// Camera info managers.
+camera_info_manager::CameraInfoManager *left_cinfo_;
+camera_info_manager::CameraInfoManager *right_cinfo_;
+
 
 // Image capture callback.
 void imageCallback(const sensor_msgs::ImageConstPtr& msg)
@@ -89,16 +98,29 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
         // Publish.
         cv_bridge::CvImage cvImage;
-        cvImage.encoding = "bgr8";
+        sensor_msgs::ImagePtr img;
+        cvImage.encoding = "rgb8";
         if (leftImagePublisher.getNumSubscribers() > 0)
         {
             cvImage.image = use_scaled ? leftScaled : leftImage;
-            leftImagePublisher.publish(cvImage.toImageMsg());
+            img = cvImage.toImageMsg();
+            leftImagePublisher.publish(img);
+        }
+        if (leftCameraInfoPublisher.getNumSubscribers() > 0)
+        {
+            leftCameraInfoMsg.header.stamp = img->header.stamp;
+            leftCameraInfoPublisher.publish(leftCameraInfoMsg);
         }
         if (rightImagePublisher.getNumSubscribers() > 0)
         {
             cvImage.image = use_scaled ? rightScaled : rightImage;
-            rightImagePublisher.publish(cvImage.toImageMsg());
+            img = cvImage.toImageMsg();
+            rightImagePublisher.publish(img);
+        }
+        if (rightCameraInfoPublisher.getNumSubscribers() > 0)
+        {
+            rightCameraInfoMsg.header.stamp = img->header.stamp;
+            rightCameraInfoPublisher.publish(rightCameraInfoMsg);
         }
     }
 }
@@ -111,22 +133,46 @@ int main(int argc, char** argv)
 
     image_transport::ImageTransport it(nh);
 
-    // load node settings
-    std::string inputImageTopic, leftOutputImageTopic, rightOutputImageTopic;
-    nh.param("input_image_topic", inputImageTopic, std::string("input_image_topic_not_set"));
+    // Allocate and initialize camera info managers.
+    left_cinfo_ =
+        new camera_info_manager::CameraInfoManager(nh, "left_camera");
+    right_cinfo_ =
+        new camera_info_manager::CameraInfoManager(nh, "right_camera");
+    left_cinfo_->loadCameraInfo("");
+    right_cinfo_->loadCameraInfo("");
+
+    // Pre-fill camera_info messages.
+    leftCameraInfoMsg = left_cinfo_->getCameraInfo();
+    rightCameraInfoMsg = right_cinfo_->getCameraInfo();
+
+
+    // Load node settings.
+    std::string inputImageTopic, leftOutputImageTopic, rightOutputImageTopic,
+        leftCameraInfoTopic, rightCameraInfoTopic;
+    nh.param("input_image_topic", inputImageTopic, 
+        std::string("input_image_topic_not_set"));
     ROS_INFO("input topic to stereo splitter=%s\n", inputImageTopic.c_str());
     nh.param("left_output_image_topic", leftOutputImageTopic,
         std::string("/stereo/left/image_raw"));
     nh.param("right_output_image_topic", rightOutputImageTopic,
         std::string("/stereo/right/image_raw"));
-    nh.param("output_width", outputWidth, 0);  // 0 -> defaults to 1/2 input width.
-    nh.param("output_height", outputHeight, 0); // 0 -> defaults to input height.
+    nh.param("left_camera_info_topic", leftCameraInfoTopic,
+        std::string("/stereo/left/camera_info"));
+    nh.param("right_camera_info_topic", rightCameraInfoTopic,
+        std::string("/stereo/right/camera_info"));    
+    nh.param("output_width", outputWidth, 0);  // 0 -> use 1/2 input width.
+    nh.param("output_height", outputHeight, 0);  // 0 -> use input height.
 
-    // register publishers and subscriber
+
+    // Register publishers and subscriber.
     imageSub = nh.subscribe(inputImageTopic.c_str(), 2, &imageCallback);
     leftImagePublisher = it.advertise(leftOutputImageTopic.c_str(), 1);
     rightImagePublisher = it.advertise(rightOutputImageTopic.c_str(), 1);
+    leftCameraInfoPublisher = nh.advertise<sensor_msgs::CameraInfo>
+        (leftCameraInfoTopic.c_str(), 1, true);
+    rightCameraInfoPublisher = nh.advertise<sensor_msgs::CameraInfo>
+        (rightCameraInfoTopic.c_str(), 1, true);
 
-    // run node until cancelled
+    // Run node until cancelled.
     ros::spin();
 }
