@@ -10,6 +10,7 @@ project(side_x_side_stereo)
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   image_transport
+  camera_info_manager
   roscpp
   sensor_msgs
   std_msgs
@@ -108,7 +109,7 @@ catkin_package(
 #  INCLUDE_DIRS include
 #  LIBRARIES side_x_side_stereo
 #  CATKIN_DEPENDS cv_bridge image_transport roscpp sensor_msgs std_msgs
-  CATKIN_DEPENDS cv_bridge image_transport roscpp sensor_msgs std_msgs
+  CATKIN_DEPENDS cv_bridge image_transport camera_info_manager roscpp sensor_msgs std_msgs
 #  DEPENDS system_lib
 )
 
