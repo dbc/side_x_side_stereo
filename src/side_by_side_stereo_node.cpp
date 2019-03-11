@@ -100,25 +100,21 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
         cv_bridge::CvImage cvImage;
         sensor_msgs::ImagePtr img;
         cvImage.encoding = "rgb8";
-        if (leftImagePublisher.getNumSubscribers() > 0)
+        if (leftImagePublisher.getNumSubscribers() > 0
+            || leftCameraInfoPublisher.getNumSubscribers() > 0)
         {
             cvImage.image = use_scaled ? leftScaled : leftImage;
             img = cvImage.toImageMsg();
             leftImagePublisher.publish(img);
-        }
-        if (leftCameraInfoPublisher.getNumSubscribers() > 0)
-        {
             leftCameraInfoMsg.header.stamp = img->header.stamp;
             leftCameraInfoPublisher.publish(leftCameraInfoMsg);
         }
-        if (rightImagePublisher.getNumSubscribers() > 0)
+        if (rightImagePublisher.getNumSubscribers() > 0
+            || rightCameraInfoPublisher.getNumSubscribers() > 0)
         {
             cvImage.image = use_scaled ? rightScaled : rightImage;
             img = cvImage.toImageMsg();
             rightImagePublisher.publish(img);
-        }
-        if (rightCameraInfoPublisher.getNumSubscribers() > 0)
-        {
             rightCameraInfoMsg.header.stamp = img->header.stamp;
             rightCameraInfoPublisher.publish(rightCameraInfoMsg);
         }
@@ -128,23 +124,24 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 
 int main(int argc, char** argv)
 {
-    ros::init(argc, argv, "side_by_side_stereo_splitter_node");
-    ros::NodeHandle nh("~");
+    ros::init(argc, argv, "sxs_stereo");
+    ros::NodeHandle nh("sxs_stereo");
+    ros::NodeHandle nh_left(nh, "left");
+    ros::NodeHandle nh_right(nh, "right");
 
     image_transport::ImageTransport it(nh);
 
     // Allocate and initialize camera info managers.
     left_cinfo_ =
-        new camera_info_manager::CameraInfoManager(nh, "left_camera");
+        new camera_info_manager::CameraInfoManager(nh_left);
     right_cinfo_ =
-        new camera_info_manager::CameraInfoManager(nh, "right_camera");
+        new camera_info_manager::CameraInfoManager(nh_right);
     left_cinfo_->loadCameraInfo("");
     right_cinfo_->loadCameraInfo("");
 
     // Pre-fill camera_info messages.
     leftCameraInfoMsg = left_cinfo_->getCameraInfo();
     rightCameraInfoMsg = right_cinfo_->getCameraInfo();
-
 
     // Load node settings.
     std::string inputImageTopic, leftOutputImageTopic, rightOutputImageTopic,
@@ -153,13 +150,13 @@ int main(int argc, char** argv)
         std::string("input_image_topic_not_set"));
     ROS_INFO("input topic to stereo splitter=%s\n", inputImageTopic.c_str());
     nh.param("left_output_image_topic", leftOutputImageTopic,
-        std::string("/stereo/left/image_raw"));
+        std::string("/sxs_stereo/left/image_raw"));
     nh.param("right_output_image_topic", rightOutputImageTopic,
-        std::string("/stereo/right/image_raw"));
+        std::string("/sxs_stereo/right/image_raw"));
     nh.param("left_camera_info_topic", leftCameraInfoTopic,
-        std::string("/stereo/left/camera_info"));
+        std::string("/sxs_stereo/left/camera_info"));
     nh.param("right_camera_info_topic", rightCameraInfoTopic,
-        std::string("/stereo/right/camera_info"));    
+        std::string("/sxs_stereo/right/camera_info"));
     nh.param("output_width", outputWidth, 0);  // 0 -> use 1/2 input width.
     nh.param("output_height", outputHeight, 0);  // 0 -> use input height.
 
@@ -168,11 +165,15 @@ int main(int argc, char** argv)
     imageSub = nh.subscribe(inputImageTopic.c_str(), 2, &imageCallback);
     leftImagePublisher = it.advertise(leftOutputImageTopic.c_str(), 1);
     rightImagePublisher = it.advertise(rightOutputImageTopic.c_str(), 1);
-    leftCameraInfoPublisher = nh.advertise<sensor_msgs::CameraInfo>
+    leftCameraInfoPublisher = nh_left.advertise<sensor_msgs::CameraInfo>
         (leftCameraInfoTopic.c_str(), 1, true);
-    rightCameraInfoPublisher = nh.advertise<sensor_msgs::CameraInfo>
+    rightCameraInfoPublisher = nh_right.advertise<sensor_msgs::CameraInfo>
         (rightCameraInfoTopic.c_str(), 1, true);
 
     // Run node until cancelled.
     ros::spin();
+
+    // De-allocate CameraInfoManagers.
+    left_cinfo_ -> ~CameraInfoManager();
+    right_cinfo_ -> ~CameraInfoManager();
 }
