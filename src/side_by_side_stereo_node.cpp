@@ -66,7 +66,7 @@ camera_info_manager::CameraInfoManager *right_cinfo_;
 void imageCallback(const sensor_msgs::ImageConstPtr& msg)
 {
     // Get double camera image.
-    cv_bridge::CvImagePtr cvImg = cv_bridge::toCvCopy(msg, "rgb8");
+    cv_bridge::CvImagePtr cvImg = cv_bridge::toCvCopy(msg, msg->encoding);
     cv::Mat image = cvImg->image;
 
     // If there are any subscribers to either output topic then publish images
@@ -99,7 +99,9 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
         // Publish.
         cv_bridge::CvImage cvImage;
         sensor_msgs::ImagePtr img;
-        cvImage.encoding = "rgb8";
+        cvImage.encoding = msg->encoding;
+        cvImage.header.frame_id = msg->header.frame_id;
+        cvImage.header.stamp = msg->header.stamp;
         if (leftImagePublisher.getNumSubscribers() > 0
             || leftCameraInfoPublisher.getNumSubscribers() > 0)
         {
@@ -107,6 +109,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
             img = cvImage.toImageMsg();
             leftImagePublisher.publish(img);
             leftCameraInfoMsg.header.stamp = img->header.stamp;
+            leftCameraInfoMsg.header.frame_id = img->header.frame_id;
             leftCameraInfoPublisher.publish(leftCameraInfoMsg);
         }
         if (rightImagePublisher.getNumSubscribers() > 0
@@ -116,6 +119,7 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
             img = cvImage.toImageMsg();
             rightImagePublisher.publish(img);
             rightCameraInfoMsg.header.stamp = img->header.stamp;
+            rightCameraInfoMsg.header.frame_id = img->header.frame_id;
             rightCameraInfoPublisher.publish(rightCameraInfoMsg);
         }
     }
