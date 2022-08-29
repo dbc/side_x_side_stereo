@@ -47,6 +47,7 @@
 // outputHeight is the same as the height of the input image.
 int outputWidth, outputHeight;
 std::string leftCameraInfoURL, rightCameraInfoURL;
+std::string leftFrame, rightFrame;
 
 // Input image subscriber.
 ros::Subscriber imageSub;
@@ -101,26 +102,31 @@ void imageCallback(const sensor_msgs::ImageConstPtr& msg)
         cv_bridge::CvImage cvImage;
         sensor_msgs::ImagePtr img;
         cvImage.encoding = msg->encoding;
-        cvImage.header.frame_id = msg->header.frame_id;
         cvImage.header.stamp = msg->header.stamp;
         if (leftImagePublisher.getNumSubscribers() > 0
             || leftCameraInfoPublisher.getNumSubscribers() > 0)
         {
+            if(leftFrame.empty())
+                leftFrame = msg->header.frame_id;
             cvImage.image = use_scaled ? leftScaled : leftImage;
+            cvImage.header.frame_id = leftFrame;
             img = cvImage.toImageMsg();
             leftImagePublisher.publish(img);
             leftCameraInfoMsg.header.stamp = img->header.stamp;
-            leftCameraInfoMsg.header.frame_id = img->header.frame_id;
+            leftCameraInfoMsg.header.frame_id = leftFrame;
             leftCameraInfoPublisher.publish(leftCameraInfoMsg);
         }
         if (rightImagePublisher.getNumSubscribers() > 0
             || rightCameraInfoPublisher.getNumSubscribers() > 0)
         {
+            if(rightFrame.empty())
+                rightFrame = msg->header.frame_id;
             cvImage.image = use_scaled ? rightScaled : rightImage;
+            cvImage.header.frame_id = rightFrame;
             img = cvImage.toImageMsg();
             rightImagePublisher.publish(img);
             rightCameraInfoMsg.header.stamp = img->header.stamp;
-            rightCameraInfoMsg.header.frame_id = img->header.frame_id;
+            rightCameraInfoMsg.header.frame_id = rightFrame;
             rightCameraInfoPublisher.publish(rightCameraInfoMsg);
         }
     }
@@ -141,6 +147,9 @@ int main(int argc, char** argv)
     ROS_INFO("left_camera_info_url=%s\n", leftCameraInfoURL.c_str());
     nh.param("right_camera_info_url", rightCameraInfoURL, std::string(""));
     ROS_INFO("right_camera_info_url=%s\n", rightCameraInfoURL.c_str());
+
+    nh.param("left_frame", leftFrame, std::string(""));
+    nh.param("right_frame", rightFrame, std::string(""));
 
     // Allocate and initialize camera info managers.
     left_cinfo_ = new camera_info_manager::CameraInfoManager(nh_left);
